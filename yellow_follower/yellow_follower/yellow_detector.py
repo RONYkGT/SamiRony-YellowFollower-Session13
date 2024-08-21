@@ -52,16 +52,17 @@ class YellowDetector(Node):
 
         # Find contours in the mask
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+        self.sphere_found = False
         # Draw bounding boxes around detected yellow areas
         for contour in contours:
             if cv2.contourArea(contour) > 100:  # Minimum area to filter noise
                 x, y, w, h = cv2.boundingRect(contour)
                 cv2.rectangle(cv_image, (x, y), (x + w, y + h), (0, 255, 0), 2)  # Draw green box
                 self.object_x = x + w / 2
-            self.sphere_found = True
-        else:
-            self.sphere_found = False
+                self.sphere_found = True
+
+                
+
 
         # Convert the OpenCV image back to ROS Image message
         processed_image_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
@@ -73,16 +74,19 @@ class YellowDetector(Node):
         self.msg = msg
         
     def control_robot(self):
-        self.get_logger().info("target x= %f" % self.object_x)
-        cmd = Twist()
+        
 
         if self.msg is None or not self.msg.ranges:
+         self.get_logger().info("returning from first if")
          return
-
+        
         min_distance = min(self.msg.ranges)
+        self.get_logger().info("target x= %f, sphere found= %s, min_distance = %f" % (self.object_x, self.sphere_found, min_distance))
 
+        cmd = Twist()
         if min_distance < 0.5 and self.sphere_found:
             # Stop if too close to any object
+            self.get_logger().info("too close")
             cmd.linear.x = 0.0
             cmd.angular.z = 0.0
         elif self.sphere_found:
@@ -92,9 +96,9 @@ class YellowDetector(Node):
                 center_x = 1920 / 2
                 
                 # Rotate to align with the target
-                if self.object_x < center_x - 700:  # Allowing more tolerance
+                if self.object_x < center_x - 200:  # Allowing more tolerance
                     cmd.angular.z = 0.5
-                elif self.object_x > center_x + 700:
+                elif self.object_x > center_x + 200:
                     cmd.angular.z = -0.5
                 else:
                     cmd.angular.z = 0.0
